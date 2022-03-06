@@ -1,5 +1,7 @@
 var https = require("https");
 var fs = require("fs");
+require("dotenv").config();
+var nodemailer = require("nodemailer");
 
 const generateInvoice = (invoice, filename, success, error) => {
   var postData = JSON.stringify(invoice);
@@ -13,9 +15,7 @@ const generateInvoice = (invoice, filename, success, error) => {
       "Content-Length": Buffer.byteLength(postData),
     },
   };
-
   var file = fs.createWriteStream(filename);
-
   var req = https.request(options, function (res) {
     res
       .on("data", function (chunk) {
@@ -23,18 +23,46 @@ const generateInvoice = (invoice, filename, success, error) => {
       })
       .on("end", function () {
         file.end();
-
         if (typeof success === "function") {
           success();
+          sendEmail(filename);
         }
       });
   });
   req.write(postData);
   req.end();
-
   if (typeof error === "function") {
     req.on("error", error);
   }
+};
+
+const sendEmail = (file) => {
+  var transport = nodemailer.createTransport({
+    host: "smtp.mailtrap.io",
+    port: 2525,
+    auth: {
+      user: process.env.MAILTRAP_USERNAME,
+      pass: process.env.MAILTRAP_PASSWORD,
+    },
+  });
+  var mailOptions = {
+    from: "invoice@me.com",
+    to: "sample@me.com",
+    subject: "Invoice for weekly payments via Node.js",
+    text: "Find attached the weekly invoice from me. Thanks",
+    attachments: [
+      {
+        path: file,
+      },
+    ],
+  };
+  transport.sendMail(mailOptions, function (error, info) {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Email sent: " + info.response);
+    }
+  });
 };
 
 let invoice = {
